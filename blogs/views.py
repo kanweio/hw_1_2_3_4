@@ -8,6 +8,7 @@ from blogs.models import Post, Comment, Hashtag
 from blogs.forms import PostCreateForm, CommmentCreateForm
 from users.utils import get_user_from_request
 
+PAGINATION_LIMIT = 4
 
 def main(request):
     if request.method == 'GET':
@@ -23,15 +24,29 @@ def main(request):
 def posts_view(request):
     if request.method == 'GET':
         hashtag_id = request.GET.get('hashtag_id')
+        search_text = request.GET.get('search')
+        page = int(request.GET.get('page', 1))
+
         if hashtag_id:
             posts = Post.objects.filter(hashtag=Hashtag.objects.get(id=hashtag_id))
         else:
             posts = Post.objects.all()
-        context = {
+
+        if search_text:
+            posts = posts.filter(title__startswith=search_text)
+
+        max_page = round(posts.__len__() / PAGINATION_LIMIT)
+
+        posts = posts[PAGINATION_LIMIT * (page - 1):PAGINATION_LIMIT * page]
+
+        data = {
             'posts': posts,
-            'user': get_user_from_request(request)
+            'user': get_user_from_request(request),
+            'hashtag_id': hashtag_id,
+            'current_page': page,
+            'max_page': range(1, max_page+1)
         }
-        return render(request, 'post/posts.html', context=context)
+        return render(request, 'post/posts.html', context=data)
 
 
 def hashtags_view(request):
@@ -83,7 +98,7 @@ def detail_view(request, **kwargs):
                 author_id=1,
                 text=form.cleaned_data.get('text'),
                 post_id=kwargs['id']
-                )
+            )
             return redirect(f'/posts/{kwargs["id"]}')
         else:
             post = Post.objects.get(id=kwargs['id']),
